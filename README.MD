@@ -38,27 +38,50 @@ docker run --rm -p 8080:8080 hephix-api
 
 The container listens on port `8080` (or `PORT` if set).
 
-## AWS deployment options
+## AWS deployment (EC2 + Docker)
 
-### AWS App Runner (simplest)
+### 1) Launch EC2
 
-1. Push this repo to GitHub.
-2. In AWS App Runner, create a new service from source or a container image.
-3. If using source, select the repo and branch; App Runner will build the Dockerfile.
-4. Set runtime environment variables if needed (none required by default).
+- AMI: Ubuntu 22.04
+- Instance type: `t2.micro` or `t3.micro` (free tier eligible)
+- Security group inbound:
+  - SSH `22` from your IP
+  - HTTP `80` from `0.0.0.0/0`
+  - HTTPS `443` from `0.0.0.0/0` (if using TLS)
 
-### ECS Fargate (container)
+### 2) Install Docker
 
-1. Build and push the image to ECR.
-2. Create an ECS Fargate service using port `8080`.
-3. Put the service behind an Application Load Balancer.
+```bash
+sudo apt update
+sudo apt install -y docker.io
+sudo usermod -aG docker ubuntu
+newgrp docker
+```
 
-### Elastic Beanstalk (Docker)
+### 3) Deploy
 
-1. Create a new Beanstalk application with the Docker platform.
-2. Deploy the repo; Beanstalk will build the Dockerfile.
+```bash
+git clone https://github.com/minusthousand/hephix-backend-prototype.git
+cd hephix-backend-prototype
+docker build -t hephix-api .
+docker run -d --restart unless-stopped -p 8080:8080 --name hephix-api hephix-api
+```
 
-Note: Playwright is optional and not installed in the Docker image by default. If you need it, add `playwright` to `requirements.txt` and run `playwright install` during image build.
+### 4) Reverse proxy (optional, for HTTPS)
+
+If you use Cloudflare or your own TLS termination, run Nginx on ports 80/443
+and proxy to `http://127.0.0.1:8080`.
+
+### CORS
+
+Set allowed origins via env var:
+
+```bash
+export CORS_ORIGINS="https://your-site.netlify.app"
+```
+
+Note: Playwright is optional. If you need it inside Docker, ensure `playwright` is in
+`requirements.txt` and install browsers during the image build.
 
 ## Endpoint
 
