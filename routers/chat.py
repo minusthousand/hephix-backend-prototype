@@ -11,5 +11,6 @@ async def chat_options():
 
 @router.post("/chat")
 async def chat(payload: ChatRequest):
-    results = await search_products(payload.message)
+    limit = payload.limit if payload.limit is not None else 10
+    results = await search_products(payload.message, limit=limit)
     return {"message": results}
