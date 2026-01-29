@@ -1,5 +1,4 @@
-import os
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 from mcp.server.fastmcp import FastMCP
@@ -7,16 +6,16 @@ from mcp.server.fastmcp import FastMCP
 mcp = FastMCP("darel")
 
 DAREL_SEARCH_URL = "https://darel.lv/en/module/iqitsearch/searchiqit"
+DAREL_BASE_URL = "https://darel.lv/"
 
 
 @mcp.tool()
-def darel_search(query: str, results_per_page: int = 10, cookie: Optional[str] = None) -> list[dict[str, Any]]:
+def darel_search(query: str, results_per_page: int = 10) -> list[dict[str, Any]]:
     """Search darel.lv and return a compact list of products.
 
     Args:
         query: Search query string.
         results_per_page: Max results to return.
-        cookie: Optional cookie string to bypass Cloudflare if needed.
     Returns:
         List of compact product dicts.
     """
@@ -26,15 +25,15 @@ def darel_search(query: str, results_per_page: int = 10, cookie: Optional[str] =
         "x-requested-with": "XMLHttpRequest",
         "origin": "https://darel.lv",
         "referer": "https://darel.lv/",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "accept-language": "en-US,en;q=0.9",
     }
-
-    cookie = cookie or os.getenv("DAREL_COOKIE")
-    if cookie:
-        headers["cookie"] = cookie
 
     data = {"s": query, "resultsPerPage": str(results_per_page), "ajax": "true"}
 
     with httpx.Client(timeout=30.0, follow_redirects=True) as client:
+        # Prime session cookies from homepage to avoid 403s.
+        client.get(DAREL_BASE_URL, headers={"user-agent": headers["user-agent"], "accept-language": headers["accept-language"]})
         r = client.post(DAREL_SEARCH_URL, headers=headers, data=data)
         r.raise_for_status()
         products = r.json().get("products", [])
