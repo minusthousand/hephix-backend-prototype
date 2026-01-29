@@ -33,9 +33,19 @@ def darel_search(query: str, results_per_page: int = 10) -> list[dict[str, Any]]
 
     with httpx.Client(timeout=30.0, follow_redirects=True) as client:
         # Prime session cookies from homepage to avoid 403s.
-        client.get(DAREL_BASE_URL, headers={"user-agent": headers["user-agent"], "accept-language": headers["accept-language"]})
+        client.get(
+            DAREL_BASE_URL,
+            headers={
+                "user-agent": headers["user-agent"],
+                "accept-language": headers["accept-language"],
+            },
+        )
         r = client.post(DAREL_SEARCH_URL, headers=headers, data=data)
-        r.raise_for_status()
+        try:
+            r.raise_for_status()
+        except httpx.HTTPStatusError:
+            # Darel frequently blocks bot-like requests; avoid crashing the API.
+            return []
         products = r.json().get("products", [])
 
     compact: list[dict[str, Any]] = []
