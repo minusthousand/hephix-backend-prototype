@@ -158,6 +158,36 @@ def _format_products(payload: dict[str, Any], limit: int) -> str:
     return "\n".join(lines).strip()
 
 
+def products_compact_from_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return a compact list of product dicts from a GraphQL payload.
+
+    Each item will contain: id, name, price, unit, availability, thumbnail, barcode
+    """
+    products_data = payload.get("data", {}).get("products", {})
+    edges = products_data.get("edges", []) or []
+
+    compact: list[dict[str, Any]] = []
+    for edge in edges:
+        node = (edge or {}).get("node", {}) or {}
+        price, unit = _pick_price(node.get("prices"))
+        availability = _summarize_stock(node.get("stockItems"))
+        thumbnail = node.get("thumbnailPictureUrl") or node.get("cardThumbnailPictureUrl")
+
+        compact.append(
+            {
+                "id": node.get("id"),
+                "name": node.get("name"),
+                "price": price,
+                "unit": unit,
+                "availability": availability,
+                "thumbnail": thumbnail,
+                "barcode": node.get("primaryBarcode"),
+            }
+        )
+
+    return compact
+
+
 @mcp.tool()
 async def search_products(query: str, limit: int = 10) -> str:
     """Search for products on online.depo.lv via GraphQL."""
@@ -183,6 +213,32 @@ async def search_products(query: str, limit: int = 10) -> str:
         return "Error: Unable to search online.depo.lv at the moment."
 
     return _format_products(payload, limit)
+
+
+async def search_products_structured(query: str, limit: int = 10) -> list[dict[str, Any]]:
+    """Search and return structured product list suitable for JSON API."""
+    if not query or not query.strip():
+        return []
+
+    limit = min(max(1, limit), 50)
+
+    variables = {
+        "start": 0,
+        "rows": limit,
+        "searchString": query.strip(),
+    }
+
+    try:
+        payload = await execute_graphql_request(
+            DEPO_GRAPHQL_ENDPOINT,
+            DEPO_PRODUCTS_QUERY,
+            variables=variables,
+        )
+    except GraphQLRequestError as exc:
+        logger.error("GraphQL search failed: %s", exc)
+        return []
+
+    return products_compact_from_payload(payload)[:limit]
 
 
 def main():
