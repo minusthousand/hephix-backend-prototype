@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from schemas import ChatRequest
 from services.depo_store import search_products
 from services.depo_store import search_products_structured
+from services.darel_store import _darel_search_with_error
 from services.darel_store import darel_search
 
 router = APIRouter()
@@ -13,11 +14,7 @@ async def chat_options():
 
 @router.post("/chat")
 async def chat(payload: ChatRequest):
-    """Compatibility chat endpoint: return combined results from Depo and Darel
-
-    This keeps older frontends that POST to `/chat` working by returning a
-    human-readable `message` that contains items from both sources.
-    """
+    """Return combined results from Depo and Darel as JSON array."""
     limit = payload.limit if payload.limit is not None else 10
 
     from asyncio import get_running_loop
@@ -27,42 +24,37 @@ async def chat(payload: ChatRequest):
     depo_results = await search_products_structured(payload.message, limit=limit)
 
     def _call_darel():
-        return darel_search(payload.message, results_per_page=limit)
+        return _darel_search_with_error(payload.message, results_per_page=limit)
 
-    darel_results = await loop.run_in_executor(None, _call_darel)
+    darel_results, darel_error = await loop.run_in_executor(None, _call_darel)
 
-    # format combined text message
-    lines = [f"Search results for: {payload.message}", ""]
+    results: list[dict[str, str | None]] = []
 
-    if depo_results:
-        lines.append("Depo results:")
-        for i, p in enumerate(depo_results[:limit], 1):
-            name = p.get("name") or "Unknown"
-            price = p.get("price") or "N/A"
-            unit = p.get("unit") or ""
-            lines.append(f"{i}. {name}")
-            lines.append(f"   Price: {price} {unit}".strip())
-            thumb = p.get("thumbnail")
-            if thumb:
-                lines.append(f"   Thumb: {thumb}")
-            lines.append("")
+    for p in depo_results[:limit]:
+        name = p.get("name") or "Unknown"
+        price = p.get("price") or "N/A"
+        unit = p.get("unit") or ""
+        price_text = f"{price} {unit}".strip()
+        thumb = p.get("thumbnail") or None
+        results.append(
+            {"title": name, "price": price_text, "thumbnail": thumb, "source": "depo"}
+        )
 
-    if darel_results:
-        lines.append("Darel results:")
-        for i, p in enumerate(darel_results[:limit], 1):
-            name = p.get("name") or "Unknown"
-            price = p.get("price") or "N/A"
-            url = p.get("url") or ""
-            lines.append(f"{i}. {name}")
-            lines.append(f"   Price: {price}")
-            if url:
-                lines.append(f"   URL: {url}")
-            lines.append("")
+    for p in darel_results[:limit]:
+        name = p.get("name") or "Unknown"
+        price = p.get("price") or "N/A"
+        thumb = p.get("thumbnail") or None
+        results.append(
+            {
+                "title": name,
+                "price": price,
+                "thumbnail": thumb,
+                "source": "darel",
+                "url": p.get("url") or None,
+            }
+        )
 
-    if not depo_results and not darel_results:
-        return {"message": "No products found."}
-
-    return {"message": "\n".join(lines)}
+    return {"results": results}
 
 
 @router.post("/darel")
@@ -164,4 +156,3 @@ async def unified_search(q: str, source: str | None = None, limit: int | None = 
             combined.append(it)
 
     return {"results": combined}
-
