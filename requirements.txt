@@ -3,3 +3,7 @@ uvicorn[standard]
 httpx
 mcp
 playwright
+python-dotenv
+langchain
+langchain-mcp-adapters
+langchain-anthropic
