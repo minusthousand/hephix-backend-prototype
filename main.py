@@ -436,10 +436,23 @@ async def root():
 
                 (data.messages || []).forEach(m => {
                     const type = m.type || 'unknown';
-                    const content = (m.data && m.data.content !== undefined)
-                        ? m.data.content : JSON.stringify(m);
+                    if (type === 'system' || type === 'tool') return;
 
-                    if (type === 'system') return;
+                    let content = '';
+                    if (m.data && m.data.content !== undefined) {
+                        if (typeof m.data.content === 'string') {
+                            content = m.data.content;
+                        } else if (Array.isArray(m.data.content)) {
+                            content = m.data.content
+                                .filter(p => p.type === 'text' && p.text)
+                                .map(p => p.text)
+                                .join('\\n');
+                        } else {
+                            content = JSON.stringify(m.data.content);
+                        }
+                    }
+
+                    if (!content.trim()) return;
                     if (type === 'human') addMessage('user', content);
                     else if (type === 'ai') addMessage('ai', content);
                 });
