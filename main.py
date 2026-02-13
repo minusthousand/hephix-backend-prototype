@@ -38,7 +38,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins or ["*"],
     allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -109,9 +109,33 @@ async def root():
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
         .session-item:hover { background: #2a2a4a; }
         .session-item.active { background: #333366; color: #fff; }
+        .session-info {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .delete-btn {
+            display: none;
+            background: none;
+            border: none;
+            color: #ff6b6b;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            flex-shrink: 0;
+            margin-left: 4px;
+            transition: background 0.15s, color 0.15s;
+        }
+        .delete-btn:hover { background: #ff6b6b; color: #fff; }
+        .session-item:hover .delete-btn { display: inline-block; }
         .session-time {
             font-size: 11px;
             color: #888;
@@ -404,9 +428,21 @@ async def root():
                     const icon = isDarel ? '🔧' : '🏠';
                     div.className = 'session-item' + (s.session_id === sid ? ' active' : '');
                     const ts = new Date(s.updated_at * 1000).toLocaleString();
-                    div.innerHTML = icon + ' ' + s.session_id.slice(0, 12) + '...'
+
+                    const info = document.createElement('span');
+                    info.className = 'session-info';
+                    info.innerHTML = icon + ' ' + s.session_id.slice(0, 12) + '...'
                         + '<div class="session-time">' + ts + '</div>';
-                    div.onclick = () => loadSession(s.session_id);
+                    info.onclick = () => loadSession(s.session_id);
+
+                    const delBtn = document.createElement('button');
+                    delBtn.className = 'delete-btn';
+                    delBtn.title = 'Delete session';
+                    delBtn.textContent = '🗑';
+                    delBtn.onclick = (e) => { e.stopPropagation(); deleteSession(s.session_id); };
+
+                    div.appendChild(info);
+                    div.appendChild(delBtn);
                     sessionListEl.appendChild(div);
                 });
             } catch (e) {
@@ -460,6 +496,17 @@ async def root():
                 loadSessions();
             } catch (e) {
                 console.error('Failed to load session:', e);
+            }
+        }
+
+        async function deleteSession(id) {
+            if (!confirm('Delete this session?')) return;
+            try {
+                await fetch('/sessions/' + id, { method: 'DELETE' });
+                if (sid === id) newChat();
+                else loadSessions();
+            } catch (e) {
+                console.error('Failed to delete session:', e);
             }
         }
 

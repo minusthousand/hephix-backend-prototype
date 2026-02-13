@@ -1,10 +1,11 @@
 """
 Chat router for Hephix backend.
 
-- POST /chat              → AI agent conversation (Depo — default)
-- POST /chat/darel        → AI agent conversation (Darel — separate)
-- GET  /sessions          → list all chat sessions
-- GET  /sessions/{id}     → full history for a session
+- POST   /chat              → AI agent conversation (Depo — default)
+- POST   /chat/darel        → AI agent conversation (Darel — separate)
+- GET    /sessions          → list all chat sessions
+- GET    /sessions/{id}     → full history for a session
+- DELETE /sessions/{id}     → delete a session
 """
 
 import os
@@ -103,3 +104,10 @@ async def get_session(session_id: str) -> SessionHistoryResponse:
         session_id=session_id,
         messages=messages or [],
     )
+
+
+@router.delete("/sessions/{session_id}")
+async def delete_session(session_id: str):
+    """Delete a chat session by ID."""
+    await SESSION_STORE.delete(session_id)
+    return {"status": "deleted", "session_id": session_id}
