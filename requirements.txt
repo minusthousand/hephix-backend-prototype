@@ -2,7 +2,6 @@ fastapi
 uvicorn[standard]
 httpx
 mcp
-playwright
 python-dotenv
 langchain
 langchain-mcp-adapters

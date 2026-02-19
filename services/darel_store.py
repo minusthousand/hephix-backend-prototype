@@ -1,5 +1,4 @@
 import logging
-import time
 from typing import Any
 
 import httpx
@@ -10,49 +9,6 @@ logger = logging.getLogger(__name__)
 
 DAREL_SEARCH_URL = "https://darel.lv/en/module/iqitsearch/searchiqit"
 DAREL_BASE_URL = "https://darel.lv/"
-DAREL_COOKIE_TTL_SECONDS = 30 * 60
-_darel_cookie_cache: dict[str, Any] = {"expires_at": 0, "cookies": None}
-
-
-def _get_darel_cookies() -> list[dict[str, Any]] | None:
-    now = time.time()
-    cached = _darel_cookie_cache.get("cookies")
-    expires_at = _darel_cookie_cache.get("expires_at", 0)
-    if cached and expires_at > now:
-        return cached
-
-    try:
-        from playwright.sync_api import sync_playwright
-    except Exception:
-        return None
-
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            context = browser.new_context(
-                locale="en-US",
-                user_agent=(
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/122.0.0.0 Safari/537.36"
-                ),
-            )
-            page = context.new_page()
-            page.goto(DAREL_BASE_URL, wait_until="domcontentloaded", timeout=15000)
-            cookies = context.cookies()
-            context.close()
-            browser.close()
-    except Exception:
-        return None
-
-    if not cookies:
-        return None
-
-    _darel_cookie_cache["cookies"] = cookies
-    _darel_cookie_cache["expires_at"] = now + DAREL_COOKIE_TTL_SECONDS
-    return cookies
-
-
 @mcp.tool()
 def darel_search(query: str, results_per_page: int = 10) -> list[dict[str, Any]]:
     """Search darel.lv and return a compact list of products.
@@ -82,19 +38,6 @@ def _darel_search_with_error(query: str, results_per_page: int = 10) -> tuple[li
     data = {"s": query, "resultsPerPage": str(results_per_page), "ajax": "true"}
 
     with httpx.Client(timeout=30.0, follow_redirects=True) as client:
-        cookies = _get_darel_cookies()
-        if cookies:
-            for c in cookies:
-                name = c.get("name")
-                value = c.get("value")
-                if not name:
-                    continue
-                client.cookies.set(
-                    name,
-                    value,
-                    domain=c.get("domain"),
-                    path=c.get("path") or "/",
-                )
         # Prime session cookies from homepage to avoid 403s.
         client.get(
             DAREL_BASE_URL,
