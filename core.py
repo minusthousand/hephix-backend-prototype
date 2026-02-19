@@ -38,6 +38,10 @@ DAREL_SERVER_PARAMS = StdioServerParameters(
     args=[str(Path(__file__).parent / "mcp_darel_server.py")],
 )
 
+EBAY_SERVER_PARAMS = StdioServerParameters(
+    command=sys.executable,
+    args=[str(Path(__file__).parent / "mcp_ebay_server.py")],
+)
 # ── System prompts ───────────────────────────────────────────────
 
 DEPO_SYSTEM_PROMPT = (
@@ -58,6 +62,13 @@ DAREL_SYSTEM_PROMPT = (
     "When not asked about products, just be a helpful conversational assistant."
 )
 
+EBAY_SYSTEM_PROMPT = (
+    "You are Hephix — a helpful, friendly shopping assistant for eBay.\n\n"
+    "When the user asks about products, use the `ebay_search` tool to look them up.\n"
+    "Reply concisely; include product titles, prices, and item URLs when available.\n"
+    "If a search returns no results, say so and suggest alternative queries.\n"
+    "When not asked about products, just be a helpful conversational assistant."
+)
 
 # ── Generic MCP Runtime ──────────────────────────────────────────
 
@@ -121,6 +132,7 @@ class MCPRuntime:
 
 DEPO_RUNTIME = MCPRuntime("depo", DEPO_SERVER_PARAMS)
 DAREL_RUNTIME = MCPRuntime("darel", DAREL_SERVER_PARAMS)
+EBAY_RUNTIME = MCPRuntime("ebay", EBAY_SERVER_PARAMS)
 
 
 # ── History helpers ──────────────────────────────────────────────
@@ -131,6 +143,9 @@ def new_depo_history() -> List[BaseMessage]:
 
 def new_darel_history() -> List[BaseMessage]:
     return [SystemMessage(content=DAREL_SYSTEM_PROMPT)]
+
+def new_ebay_history() -> List[BaseMessage]:
+    return [SystemMessage(content=EBAY_SYSTEM_PROMPT)]
 
 
 # ── Agent chat functions ─────────────────────────────────────────
@@ -163,3 +178,8 @@ async def chat_depo(history: List[BaseMessage], user_text: str) -> List[BaseMess
 async def chat_darel(history: List[BaseMessage], user_text: str) -> List[BaseMessage]:
     """Darel agent — separate chat endpoint."""
     return await _chat_once(DAREL_RUNTIME, DAREL_SYSTEM_PROMPT, history, user_text)
+
+
+async def chat_ebay(history: List[BaseMessage], user_text: str) -> List[BaseMessage]:
+    """eBay agent — separate chat endpoint."""
+    return await _chat_once(EBAY_RUNTIME, EBAY_SYSTEM_PROMPT, history, user_text)

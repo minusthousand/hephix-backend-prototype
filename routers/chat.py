@@ -2,7 +2,8 @@
 Chat router for Hephix backend.
 
 - POST   /chat              → AI agent conversation (Depo — default)
-- POST   /chat/darel        → AI agent conversation (Darel — separate)
+ - POST   /chat/darel        → AI agent conversation (Darel — separate)
+ - POST   /chat/ebay         → AI agent conversation (eBay — separate)
 - GET    /sessions          → list all chat sessions
 - GET    /sessions/{id}     → full history for a session
 - DELETE /sessions/{id}     → delete a session
@@ -15,7 +16,14 @@ from fastapi import APIRouter
 
 from schemas import ChatRequest, ChatResponse
 from schemas import SessionInfo, SessionListResponse, SessionHistoryResponse
-from core import chat_depo, chat_darel, new_depo_history, new_darel_history
+from core import (
+    chat_depo,
+    chat_darel,
+    chat_ebay,
+    new_depo_history,
+    new_darel_history,
+    new_ebay_history,
+)
 from session_store import SQLiteMessageHistoryStore
 
 router = APIRouter()
@@ -71,6 +79,35 @@ async def chat_darel_endpoint(payload: ChatRequest) -> ChatResponse:
 
     try:
         history = await chat_darel(history, payload.message)
+        await SESSION_STORE.set(session_id, history)
+        return ChatResponse(
+            session_id=session_id,
+            response=str(history[-1].content),
+        )
+    except Exception as e:
+        return ChatResponse(
+            session_id=session_id,
+            response=f"Sorry, something went wrong: {e}",
+        )
+
+
+# ──────────────────────────────────────────────
+#  eBay chat (separate endpoint)
+# ──────────────────────────────────────────────
+
+@router.options("/chat/ebay")
+async def chat_ebay_options():
+    return {}
+
+
+@router.post("/chat/ebay", response_model=ChatResponse)
+async def chat_ebay_endpoint(payload: ChatRequest) -> ChatResponse:
+    """AI conversation — Claude + eBay MCP tools."""
+    session_id = payload.session_id or f"ebay-{uuid.uuid4().hex}"
+    history = await SESSION_STORE.get_or_create(session_id, new_ebay_history)
+
+    try:
+        history = await chat_ebay(history, payload.message)
         await SESSION_STORE.set(session_id, history)
         return ChatResponse(
             session_id=session_id,

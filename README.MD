@@ -1,6 +1,6 @@
 # Hephix API Prototype
 
-A minimal FastAPI service with a single `/chat` endpoint that queries online.depo.lv via GraphQL based on your message.
+A FastAPI backend that powers Hephix — a multi-store shopping assistant with MCP-backed tools.
 
 ## Requirements
 
@@ -24,6 +24,39 @@ uvicorn main:app --reload
 ```
 
 The API will be available at `http://127.0.0.1:8000`.
+
+## Environment
+
+Core:
+
+```bash
+export CORS_ORIGINS="https://your-site.netlify.app"
+export ENABLE_FRONTEND=true  # optional, enables GET /
+```
+
+Anthropic (required for chat):
+
+```bash
+export ANTHROPIC_API_KEY="..."
+export ANTHROPIC_MODEL="claude-haiku-4-5-20251001"  # optional
+```
+
+eBay (required for /chat/ebay):
+
+```bash
+export EBAY_CLIENT_ID="..."
+export EBAY_CLIENT_SECRET="..."
+export EBAY_ENV=production        # or sandbox
+export EBAY_MARKETPLACE_ID=EBAY_US
+```
+
+eBay Marketplace Account Deletion (required for compliance webhook):
+
+```bash
+export EBAY_MAD_ENABLED=true
+export EBAY_MAD_VERIFICATION_TOKEN="your-verification-token"
+export EBAY_MAD_ENDPOINT_URL="https://your.domain/ebay/account-deletion"
+```
 
 ## Docker (for AWS)
 
@@ -76,10 +109,11 @@ Set allowed origins via env var:
 export CORS_ORIGINS="https://your-site.netlify.app"
 ```
 
-
-## Endpoint
+## Endpoints
 
 ### POST /chat
+
+Default store (Depo.lv).
 
 Request body:
 
@@ -96,3 +130,39 @@ Response body:
   "message": "Search results for 'hello' on online.depo.lv:\n\n1. ...\n"
 }
 ```
+
+### POST /chat/darel
+
+Darel.lv store. Same request/response shape as `/chat`.
+
+### POST /chat/ebay
+
+eBay store (Browse API). Same request/response shape as `/chat`.
+
+### GET /
+
+Static frontend (only when `ENABLE_FRONTEND=true`).
+
+### GET /sessions
+
+List chat sessions.
+
+### GET /sessions/{id}
+
+Get full chat history for a session.
+
+### DELETE /sessions/{id}
+
+Delete a chat session.
+
+### GET /mcp/info
+
+Inspect MCP tool status per store.
+
+### GET /ebay/account-deletion
+
+eBay Marketplace account deletion challenge endpoint.
+
+### POST /ebay/account-deletion
+
+eBay Marketplace account deletion notifications (acknowledged immediately; data deletion handled server-side).
